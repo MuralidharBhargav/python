@@ -1,3 +1,5 @@
+https://chatgpt.com/share/680e5281-a394-8006-a7a4-4d972d61e88a
+
 To build a central metadata repository combining:
 Layer	Metadata Type	Examples
 Operational Metadata	Freshness, Data Arrival, ETL job status, Runtime stats	Dataproc job start/end, GCS file arrival times
