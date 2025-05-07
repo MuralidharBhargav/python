@@ -12,57 +12,59 @@ sudo apt-get install graphviz libgraphviz-dev
   |-- main_orchestrator.py   # (optional orchestrator to call everything!)
 
 
-from google.cloud import bigquery
+from google.cloud import logging_v2
 from datetime import datetime, timedelta
+import time
 
-# === CONFIG ===
+# Initialize Cloud Logging client
+client = logging_v2.Client()
+
+# Your parameters
 project_id = 'your-project-id'
 dataset_name = 'your_dataset'
-table_name = 'your_table'
-region = 'us'  # Example: 'us', 'europe-west2', 'asia-northeast1'
-lookback_hours = 24  # How far back to look
+poll_interval = 30  # seconds
 
-# Build the region-based INFORMATION_SCHEMA path
-info_schema = f"region-{region}.INFORMATION_SCHEMA.JOBS_BY_PROJECT"
-
-# Time window
-time_threshold = (datetime.utcnow() - timedelta(hours=lookback_hours)).isoformat()
-
-# Build the query
-query = f"""
-SELECT
-  creation_time,
-  user_email,
-  statement_type,
-  query
-FROM
-  `{info_schema}`
-WHERE
-  creation_time >= TIMESTAMP('{time_threshold}')
-  AND statement_type IN ('INSERT', 'UPDATE', 'DELETE')
-  AND query LIKE '%{dataset_name}.{table_name}%'
-ORDER BY
-  creation_time DESC
+# Build the filter to catch table changes in the dataset
+log_filter = f"""
+resource.type="bigquery_resource"
+protoPayload.serviceData.jobCompletedEvent.job.jobStatistics.referencedTables:("{dataset_name}")
+OR protoPayload.resourceName:"{dataset_name}"
+protoPayload.methodName=~"(Insert|Load|Update|Delete)"
 """
 
-# Initialize BigQuery client
-client = bigquery.Client(project=project_id)
+def poll_logs():
+    # Get logs from the last X minutes
+    time_window_start = (datetime.utcnow() - timedelta(minutes=5)).isoformat("T") + "Z"
+    entries = client.list_entries(
+        filter_=log_filter,
+        order_by=logging_v2.DESCENDING,
+        page_size=20,
+        project_ids=[project_id],
+    )
+    events = []
+    for entry in entries:
+        payload = entry.payload
+        timestamp = entry.timestamp
+        method = payload.get('methodName', 'UNKNOWN')
+        resource = payload.get('resourceName', 'UNKNOWN')
+        principal_email = payload.get('authenticationInfo', {}).get('principalEmail', 'UNKNOWN')
+        events.append({
+            'timestamp': timestamp,
+            'method': method,
+            'resource': resource,
+            'user': principal_email
+        })
+    return events
 
-# Run the query
-print(f"🔍 Checking recent jobs for {dataset_name}.{table_name} (last {lookback_hours} hours)...\n")
+# Poll in loop
+while True:
+    print(f"\n🔄 Checking logs at {datetime.utcnow().isoformat()}...")
+    events = poll_logs()
+    if events:
+        for event in events:
+            print(f"✅ [{event['timestamp']}] {event['method']} on {event['resource']} by {event['user']}")
+    else:
+        print("No new events.")
+    time.sleep(poll_interval)
 
-query_job = client.query(query)
-
-# Fetch and display results
-results = query_job.result()
-
-found = False
-for row in results:
-    found = True
-    print(f"🕒 {row.creation_time} | 👤 {row.user_email} | 📝 {row.statement_type}")
-    print(f"SQL: {row.query[:200]}...")  # Show first 200 chars
-    print("-" * 60)
-
-if not found:
-    print("✅ No recent INSERT/UPDATE/DELETE jobs found.")
 
