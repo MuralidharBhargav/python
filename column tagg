@@ -1,0 +1,68 @@
+from google.cloud import datacatalog_v1
+
+# Initialize Data Catalog client
+datacatalog = datacatalog_v1.DataCatalogClient()
+
+# Set your parameters
+project_id = 'your-project-id'
+location = 'your-location'  # e.g., 'europe-west2'
+entry_group_id = 'your-entry-group'
+entry_id = 'your-entry-id'  # Table entry ID
+template_id = 'your-tag-template-id'
+
+# Paths
+entry_path = datacatalog.entry_path(project_id, location, entry_group_id, entry_id)
+template_path = datacatalog.tag_template_path(project_id, location, template_id)
+
+# Define the columns you want to tag and their fields
+columns_to_tag = [
+    {
+        'column_name': 'email',
+        'fields': {
+            'sensitivity_level': {'enum': 'HIGH'},
+            'business_process': {'string': 'Onboarding'},
+            'description': {'string': 'Contains customer email addresses'}
+        }
+    },
+    {
+        'column_name': 'customer_id',
+        'fields': {
+            'sensitivity_level': {'enum': 'MEDIUM'},
+            'business_process': {'string': 'Customer Management'}
+        }
+    },
+    {
+        'column_name': 'last_purchase_date',
+        'fields': {
+            'sensitivity_level': {'enum': 'LOW'},
+            'business_process': {'string': 'Sales'}
+        }
+    }
+]
+
+# Loop through columns and apply tags
+for col in columns_to_tag:
+    column_name = col['column_name']
+    fields = col['fields']
+
+    # Create the tag object
+    tag = datacatalog_v1.types.Tag()
+    tag.template = template_path
+    tag.column = column_name  # 👈 This is key for column-level tagging
+
+    # Set tag fields dynamically
+    for field_name, field_value in fields.items():
+        if 'string' in field_value:
+            tag.fields[field_name].string_value = field_value['string']
+        elif 'enum' in field_value:
+            tag.fields[field_name].enum_value.display_name = field_value['enum']
+        elif 'double' in field_value:
+            tag.fields[field_name].double_value = field_value['double']
+        elif 'bool' in field_value:
+            tag.fields[field_name].bool_value = field_value['bool']
+
+    # Create the tag in Data Catalog
+    created_tag = datacatalog.create_tag(parent=entry_path, tag=tag)
+    print(f"✅ Tagged column '{column_name}' successfully with tag: {created_tag.name}")
+
+print("\n🎉 All columns tagged successfully!")
