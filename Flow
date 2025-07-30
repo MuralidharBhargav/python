@@ -1,0 +1,54 @@
+Here’s a clear **end‑to‑end sequence of actions** I can infer from your flow diagram (left→right, top→bottom). I’ve grouped steps under the same swim‑lanes your diagram shows.
+
+---
+
+## 1) Sources & Landing
+
+1. **Vendor files/API feed arrive** (CSV/Excel/JSON via SFTP/API).
+2. Files are **landed in GCS “source” bucket** (raw zone) with versioning/retention.
+3. **Ingestion trigger fires** (event on new object) and creates an **ingestion run‑ID**.
+
+## 2) Ingestion & Audit
+
+4. **Data‑in scripts validate** file name, size, schema header, and date window.
+5. **Metadata is captured** (file name, source, row counts, checksum, load time, user) into an **Audit Table** (BigQuery).
+6. If validation **fails → mark run as “failed”** in Audit Table and **notify** (email/Slack); hold file for remediation.
+
+## 3) Staging & Transformations
+
+7. Valid files are **parsed and loaded to staging tables** (BQ).
+8. **Standardization transforms** run (type casting, trimming, null handling, code mappings).
+9. **Business transformations** run (joins, derived fields, SCD handling) using **BQ SQL scripts**.
+10. Transformed data is **written to curated (gold) tables**.
+11. **Lineage & row‑counts** for each hop are appended to the **Audit Table**.
+
+## 4) Data Quality Engine
+
+12. **Auto‑profiling** computes stats (null %, distinct count, ranges, drift).
+13. **DQ rule execution** (completeness, validity, conformity, duplicates, referential checks).
+14. **Anomaly detection** flags unusual distributions/threshold breaches.
+15. **DQ results & scores** are written to **DQ results tables** (rule‑level outcomes, severities, timestamps).
+
+## 5) Exception Management
+
+16. **Exception extractor** collects all failed records/rules into **Exception Tables**.
+17. **Routing & prioritization** (owner, severity, SLA) populate the **Exception Dashboard**.
+18. **Auto‑mitigation** applies safe fixes where configured (e.g., standard code substitutions, default values).
+19. **Manual remediation workflow** (assign, comment, resolve) for the rest.
+20. **Audit & reporting** summarize exceptions, MTTR, pass rates, and trend to management.
+
+## 6) Implementation/Foundation (bottom swim‑lane)
+
+21. **Environment setup** (projects, GCS buckets, BQ datasets, service accounts, secrets/KMS).
+22. **Access controls** (IAM roles, least privilege; optionally VPC‑SC perimeter).
+23. **Orchestration/CI‑CD** (pipeline definitions, deploy scripts, config promotion Dev→Prod).
+24. **Monitoring & alerting** (job health, budget, data freshness, DQ SLA alerts).
+25. **Runbooks & support** (on‑call, rollback procedures, data issue playbooks).
+
+---
+
+### At‑a‑glance flow (text BPMN)
+
+**Source → GCS Raw → Validate & Audit → BQ Staging → Transform (BQ) → Curated Tables → DQ Engine (profile + rules + anomalies) → Exception Tables/Dashboard → Auto/Manual Remediation → Audit & Exec Reporting**
+
+If you want, I can convert this into a **one‑page SOP/checklist** or a **clean slide** that mirrors your diagram with these numbered steps.
