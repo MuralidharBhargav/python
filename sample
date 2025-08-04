@@ -1,91 +1,68 @@
-# main_orchestrator.py
 
-from gcs_logging_fetcher import fetch_gcs_uploads
-from dataproc_logging_fetcher import fetch_dataproc_jobs
-from bq_metadata_collector import collect_bq_table_metadata
-from datacatalog_tagging import attach_tags
+  Got it—here are competitor snapshots in the same structure as your DataBuck slide.
 
-from datetime import datetime
+---
 
-# Configurations
-PROJECT_ID = "gbmamgdataeval"
-LOCATION = "europe-west2"
+## Monte Carlo (Data Observability)
 
-# --- User input ---
-FILE_PATTERN = "gs://amgdatabucket/sales-data-*.csv"
+**Source:** montecarlo.com
 
-def orchestrate_metadata_collection(file_pattern):
-    print(f"🔍 Starting Metadata Collection for file pattern: {file_pattern}")
+### Key Observations
 
-    # 1. Fetch GCS Upload Events
-    gcs_files = fetch_gcs_uploads(file_pattern, PROJECT_ID)
-    print(f"✅ Found {len(gcs_files)} matching GCS files.")
+1. Positions itself as an end-to-end **Data Observability** platform built on the “5 pillars”: **freshness, volume, schema, lineage, and quality**.
+2. Strong focus on **incident management** (alerting, triage, ownership, SLAs) and **root-cause analysis** using lineage across warehouse, ETL, and BI.
+3. **Broad integrations** (Snowflake/BigQuery/Databricks, dbt, Airflow, Fivetran, Looker/Tableau, Slack/Jira/PagerDuty) aimed at fast rollout.
+4. Case studies emphasize **reducing data downtime** and protecting business KPIs; pricing typically enterprise-tier (by usage/rows/assets).
 
-    # 2. Fetch Dataproc Jobs Processing Those Files
-    dataproc_jobs = fetch_dataproc_jobs(file_pattern, PROJECT_ID)
-    print(f"✅ Found {len(dataproc_jobs)} matching Dataproc jobs.")
+### Strengths | Limitations
 
-    if not dataproc_jobs:
-        print("⚠️ No Dataproc jobs found matching the file pattern!")
-        return
+**Strengths**
 
-    # 3. For each Dataproc Job
-    for job in dataproc_jobs:
-        print(f"🔎 Processing Dataproc Job ID: {job['job_id']}")
+* **Auto-monitoring at scale:** Out-of-the-box tests for freshness/volume/schema + statistical anomaly detection reduce manual rule writing.
+* **Lineage-driven RCA:** Column/field-level lineage (where supported) speeds blast-radius analysis and owner assignment.
+* **Incident workflow:** Native runbooks, SLAs, suppression, and integrations with on-call tools fit Ops processes.
+* **Time-to-value:** Agentless/connectors-first model; minimal code to start seeing alerts.
 
-        # (Optional enhancement: match which output tables belong to which file)
-        output_tables = job.get("output_tables", [])
-        
-        if not output_tables:
-            print(f"⚠️ No output tables linked to job {job['job_id']}. Skipping tagging.")
-            continue
+**Limitations**
 
-        # 4. For each output table
-        for table_id in output_tables:
-            # Expecting format: project.dataset.table
-            project_id, dataset_id, table_name = table_id.split('.')
+* **Less prescriptive “rules studio”:** Geared to anomaly detection; complex, bespoke business rules still require external tools/dbt tests.
+* **Opaque models:** Limited transparency/controls on how anomalies are scored can challenge regulated teams.
+* **Cost at scale:** Pricing can rise with asset and event volume; careful scoping/tagging needed.
+* **Warehouse-first bias:** Non-SQL and streaming ecosystems may need extra workarounds/integrations.
 
-            # Fetch Technical Metadata
-            bq_metadata = collect_bq_table_metadata(project_id, dataset_id, table_name)
+---
 
-            # Build Operational Metadata
-            operational_metadata = {
-                "source_file": gcs_files[0]['bucket'] + "/" + gcs_files[0]['object'] if gcs_files else "unknown",
-                "job_id": job["job_id"],
-                "job_status": job["status"],  # You might extend to detect true job status from job logs
-                "start_time": datetime.now(),
-                "end_time": datetime.now(),
-                "freshness_status": "FRESH",
-            }
+## DataOps.live (DataOps for Snowflake)
 
-            # Build Technical Metadata
-            technical_metadata = {
-                "owner": "data.owner@example.com",
-                "last_modified": bq_metadata.get("last_modified"),
-                "last_queried": bq_metadata.get("last_modified"),  # Simplification
-                "num_rows": bq_metadata.get("num_rows"),
-                "size_bytes": bq_metadata.get("size_bytes"),
-                "table_type": bq_metadata.get("table_type"),
-            }
+**Source:** dataops.live
 
-            # Build Business Metadata
-            business_metadata = {
-                "business_owner": "sales@company.com",
-                "criticality": "HIGH",
-                "sla_hours": 24,
-                "business_process": "Sales Reporting",
-            }
+### Key Observations
 
-            # 5. Attach Tags
-            print(f"🏷️ Attaching tags to {table_id}...")
-            attach_tags(
-                entry_name=bq_metadata.get("entry_resource_name"),
-                project_id=PROJECT_ID,
-                location=LOCATION,
-                operational_data=operational_metadata,
-                technical_data=technical_metadata,
-                business_data=business_metadata
-            )
+1. A **DataOps platform centered on Snowflake**, combining **orchestration, CI/CD, environment management**, and governance.
+2. Emphasizes **development lifecycle** (branches, pull requests, automated testing) and **ephemeral environments** for data products.
+3. Includes **observability & testing** (metadata, quality checks, change control) but with a DevOps/SDLC framing vs. pure observability.
+4. Strong fit for **Snowflake-centric programs**; offers Snowflake Native App and tight security/governance alignment.
 
-if __name__ == "__main__":
-    orchestrate_metadata_collection(FILE_PATTERN)
+### Strengths | Limitations
+
+**Strengths**
+
+* **True CI/CD for data:** Versioned pipelines, automated tests, and promotion gates reduce release risk.
+* **Environment automation:** On-demand, isolated environments speed feature work and UAT without copy-paste projects.
+* **Policy & governance baked-in:** Change approval, auditability, and separation of duties help enterprise compliance.
+* **Snowflake performance fit:** Deep integration (warehouses, roles, tags, cost controls) aids operational efficiency.
+
+**Limitations**
+
+* **Snowflake dependency:** Value proposition declines outside Snowflake; multi-warehouse orgs face gaps.
+* **Setup complexity:** Requires process discipline (branching, tests, templates) to realize benefits; steeper onboarding for analytics teams.
+* **Observability breadth:** Quality/monitoring is improving but not as specialized as dedicated observability vendors.
+* **License/infra overlap:** May duplicate parts of existing orchestrators (Airflow/DBT Cloud) and monitoring stacks.
+
+---
+
+### How to use these in your internal deck
+
+* Keep the **left pane** as “Key Observations (1–4)” exactly as above.
+* Put the **Strengths vs. Limitations** bullets into the right-hand table.
+* If you want, I can tailor the bullets to your stack (Snowflake/BigQuery/dbt/etc.) or add **quantified estimates** (e.g., likely deployment effort, rough TCO bands, typical team profiles).
